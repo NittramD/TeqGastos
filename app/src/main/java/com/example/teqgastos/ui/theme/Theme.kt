@@ -8,15 +8,36 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+
+val LocalIsDarkTheme = staticCompositionLocalOf { false }
+
+@Composable
+fun neuBackgroundColor(): Color = if (LocalIsDarkTheme.current) NeuDarkBackground else NeuBackground
+
+@Composable
+fun neuSurfaceColor(): Color = if (LocalIsDarkTheme.current) NeuDarkSurface else NeuSurface
 
 private val DarkColorScheme = darkColorScheme(
     primary = TeqDarkPrimary,
     onPrimary = TeqDarkOnPrimary,
     primaryContainer = TeqDarkPrimaryContainer,
-    background = TeqDarkBackground,
-    surface = TeqDarkSurface,
-    onSurface = TeqDarkOnSurface
+    onPrimaryContainer = Color(0xFFD1E4FF),
+    secondary = Color(0xFF4FD8EB),
+    onSecondary = Color(0xFF00363D),
+    secondaryContainer = Color(0xFF004F58),
+    onSecondaryContainer = Color(0xFF97F0FF),
+    background = NeuDarkBackground,
+    onBackground = Color(0xFFF1F5F9),
+    surface = NeuDarkSurface,
+    onSurface = Color(0xFFF1F5F9),
+    surfaceVariant = Color(0xFF334155),
+    onSurfaceVariant = Color(0xFFCBD5E1),
+    error = Color(0xFFFFB4AB),
+    errorContainer = Color(0xFF93000A)
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -30,9 +51,9 @@ private val LightColorScheme = lightColorScheme(
     onSecondaryContainer = TeqOnSecondaryContainer,
     tertiary = TeqTertiary,
     tertiaryContainer = TeqTertiaryContainer,
-    background = TeqBackground,
+    background = NeuBackground,
     onBackground = TeqOnBackground,
-    surface = TeqSurface,
+    surface = NeuSurface,
     onSurface = TeqOnSurface,
     surfaceVariant = TeqSurfaceVariant,
     onSurfaceVariant = TeqOnSurfaceVariant,
@@ -55,9 +76,11 @@ fun TeqGastosTheme(
         else -> LightColorScheme
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(LocalIsDarkTheme provides darkTheme) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }

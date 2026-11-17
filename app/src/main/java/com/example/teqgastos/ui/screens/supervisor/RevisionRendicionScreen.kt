@@ -14,18 +14,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.AssignmentTurnedIn
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -33,7 +31,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -59,140 +56,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.lazy.LazyRow
-import com.example.teqgastos.data.local.entity.AuditoriaEntity
 import com.example.teqgastos.data.local.entity.GastoEntity
 import com.example.teqgastos.ui.components.EstadoGastoBadge
 import com.example.teqgastos.ui.components.EstadoRendicionBadge
 import com.example.teqgastos.ui.components.GlassmorphicButton
 import com.example.teqgastos.ui.components.NielsenHelpDialog
+import com.example.teqgastos.ui.components.SignatureDialog
 import com.example.teqgastos.ui.components.TeqConfirmationDialog
 import com.example.teqgastos.ui.components.formatClp
-import com.example.teqgastos.ui.theme.NeuBackground
 import com.example.teqgastos.ui.theme.TeqPrimary
 import com.example.teqgastos.ui.theme.TeqSuccess
 import com.example.teqgastos.ui.theme.TeqWarning
 import com.example.teqgastos.ui.viewmodel.SupervisorViewModel
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SupervisorBandejaScreen(
-    viewModel: SupervisorViewModel,
-    onNavigateToRevision: (Long) -> Unit,
-    onLogout: () -> Unit
-) {
-    val rendiciones by viewModel.rendicionesPendientes.collectAsState()
-    var showHelpDialog by remember { mutableStateOf(false) }
-
-    if (showHelpDialog) {
-        NielsenHelpDialog(onDismissRequest = { showHelpDialog = false })
-    }
-
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Bandeja de Aprobación", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = TeqPrimary)
-                        Text("Jefatura de Servicio Técnico · TEQMED", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { showHelpDialog = true }) {
-                        Icon(Icons.Default.HelpOutline, contentDescription = "Ayuda y Políticas", tint = TeqPrimary)
-                    }
-                    IconButton(onClick = onLogout) {
-                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Cambiar Rol")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
-            )
-        }
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            item {
-                Text(
-                    text = "Rendiciones Pendientes de tu Equipo",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Revisa gastos en terreno y aprueba o devuelve con observaciones.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
-            }
-
-            if (rendiciones.isEmpty()) {
-                item {
-                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 60.dp), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.AssignmentTurnedIn, contentDescription = null, tint = TeqSuccess, modifier = Modifier.size(54.dp))
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text("¡Estás al día!", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                            Text("No tienes rendiciones pendientes de revisión.", color = MaterialTheme.colorScheme.outline)
-                        }
-                    }
-                }
-            } else {
-                items(rendiciones, key = { it.rendicion.id }) { item ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onNavigateToRevision(item.rendicion.id) },
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Person, contentDescription = null, tint = TeqPrimary)
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(item.rendicion.tecnicoNombre, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                                }
-                                EstadoRendicionBadge(estado = item.rendicion.estado)
-                            }
-
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(item.rendicion.titulo, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                            Text(item.rendicion.centroCostoNombre, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.Bottom
-                            ) {
-                                Column {
-                                    Text("Total a Revisar", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                                    Text(item.totalRendidoClp.formatClp(), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = TeqPrimary)
-                                }
-                                Text(
-                                    text = "${item.gastos.size} gastos registrados",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+import java.io.File
+import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -210,12 +91,14 @@ fun RevisionRendicionScreen(
     val auditoriaList by viewModel.getAuditoriaFlow(rendicionId).collectAsState(initial = emptyList())
     val snackbarHostState = remember { SnackbarHostState() }
     val uiMessage by viewModel.uiMessage.collectAsState()
+    val context = LocalContext.current
 
     var gastoParaObservar by remember { mutableStateOf<GastoEntity?>(null) }
     var textoObservacion by remember { mutableStateOf("") }
     var observacionError by remember { mutableStateOf<String?>(null) }
     var mostrarModalAuditoria by remember { mutableStateOf(false) }
     var showConfirmAprobarDialog by remember { mutableStateOf(false) }
+    var showSignatureDialog by remember { mutableStateOf(false) }
     var showHelpDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiMessage) {
@@ -229,20 +112,42 @@ fun RevisionRendicionScreen(
         NielsenHelpDialog(onDismissRequest = { showHelpDialog = false })
     }
 
+    if (showSignatureDialog && rendicionConGastos != null) {
+        val rItem = rendicionConGastos!!
+        SignatureDialog(
+            titulo = "Firma de Aprobación de Jefatura",
+            subtitulo = "Estampe su rúbrica digital manuscrita para autorizar formalmente la rendición médica '${rItem.rendicion.titulo}' por ${rItem.totalRendidoClp.formatClp()} y derivarla a Finanzas.",
+            nombreFirmante = "Dra. Marcela Fuentes",
+            rutFirmante = "12.839.210-4",
+            onDismissRequest = { showSignatureDialog = false },
+            onSignatureConfirmed = { _, signatureFile ->
+                showSignatureDialog = false
+                try {
+                    val targetDir = File(context.filesDir, "signatures").apply { if (!exists()) mkdirs() }
+                    val targetFile = File(targetDir, "supervisor_signature_${rItem.rendicion.id}.png")
+                    signatureFile.copyTo(targetFile, overwrite = true)
+                } catch (e: Exception) {
+                    Log.w("RevisionRendicion", "No se pudo respaldar firma: ${e.message}")
+                }
+                viewModel.aprobarTodaLaRendicion(rItem.rendicion.id) {
+                    onNavigateBack()
+                }
+            }
+        )
+    }
+
     if (showConfirmAprobarDialog && rendicionConGastos != null) {
         val rItem = rendicionConGastos!!
         TeqConfirmationDialog(
             title = "¿Aprobar Rendición de Servicio?",
-            message = "¿Confirmas la aprobación de '${rItem.rendicion.titulo}' por ${rItem.totalRendidoClp.formatClp()}? Pasará formalmente a Finanzas para el proceso de liquidación contable y reembolso.",
-            confirmText = "Aprobar y Derivar",
+            message = "¿Confirmas la aprobación de '${rItem.rendicion.titulo}' por ${rItem.totalRendidoClp.formatClp()}? A continuación deberás estampar la firma de aprobación de jefatura.",
+            confirmText = "Aprobar y Firmar",
             cancelText = "Continuar Revisando",
             isDestructive = false,
             icon = Icons.Default.CheckCircle,
             onConfirm = {
                 showConfirmAprobarDialog = false
-                viewModel.aprobarTodaLaRendicion(rItem.rendicion.id) {
-                    onNavigateBack()
-                }
+                showSignatureDialog = true
             },
             onDismiss = { showConfirmAprobarDialog = false }
         )
@@ -389,9 +294,21 @@ fun RevisionRendicionScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(r.tecnicoNombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text(r.titulo, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                    Column(modifier = Modifier.fillMaxWidth().padding(end = 4.dp)) {
+                        Text(
+                            text = r.tecnicoNombre,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = r.titulo,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 },
                 navigationIcon = {
@@ -422,7 +339,7 @@ fun RevisionRendicionScreen(
                         Text(item.totalRendidoClp.formatClp(), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge, color = TeqPrimary)
                     }
                     GlassmorphicButton(
-                        onClick = { showConfirmAprobarDialog = true },
+                        onClick = { showSignatureDialog = true },
                         cornerRadius = 14.dp
                     ) {
                         Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)

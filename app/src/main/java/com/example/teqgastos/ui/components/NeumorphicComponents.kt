@@ -36,9 +36,16 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.example.teqgastos.ui.theme.LocalIsDarkTheme
 import com.example.teqgastos.ui.theme.NeuBackground
 import com.example.teqgastos.ui.theme.NeuBorder
+import com.example.teqgastos.ui.theme.NeuDarkBackground
+import com.example.teqgastos.ui.theme.NeuDarkBorder
+import com.example.teqgastos.ui.theme.NeuDarkDarkShadow
+import com.example.teqgastos.ui.theme.NeuDarkLightShadow
+import com.example.teqgastos.ui.theme.NeuDarkPressed
 import com.example.teqgastos.ui.theme.NeuDarkShadow
+import com.example.teqgastos.ui.theme.NeuDarkSurface
 import com.example.teqgastos.ui.theme.NeuLightShadow
 import com.example.teqgastos.ui.theme.NeuPressed
 import com.example.teqgastos.ui.theme.NeuSurface
@@ -100,16 +107,22 @@ fun Modifier.neumorphic(
     }
 }
 
-// Tarjeta Neumorphic Extruida
+// Tarjeta Neumorphic Extruida con soporte de Modo Oscuro automático
 @Composable
 fun NeumorphicCard(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 18.dp,
     elevation: Dp = 4.dp,
-    backgroundColor: Color = NeuSurface,
+    backgroundColor: Color = Color.Unspecified,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val isDark = LocalIsDarkTheme.current
+    val effectiveBg = if (backgroundColor != Color.Unspecified) backgroundColor else (if (isDark) NeuDarkSurface else NeuSurface)
+    val effectiveLightShadow = if (isDark) NeuDarkLightShadow else NeuLightShadow.copy(alpha = 0.85f)
+    val effectiveDarkShadow = if (isDark) NeuDarkDarkShadow else NeuDarkShadow.copy(alpha = 0.55f)
+    val effectivePressed = if (isDark) NeuDarkPressed else NeuPressed
+
     val shape = RoundedCornerShape(cornerRadius)
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -125,12 +138,14 @@ fun NeumorphicCard(
             .padding(elevation) // Espacio para que respiren las sombras
             .neumorphic(
                 cornerRadius = cornerRadius,
+                lightShadowColor = effectiveLightShadow,
+                darkShadowColor = effectiveDarkShadow,
                 offset = currentOffset,
                 blur = currentOffset * 2,
                 isPressed = isPressed
             )
             .clip(shape)
-            .background(if (isPressed) NeuPressed else backgroundColor)
+            .background(if (isPressed) effectivePressed else effectiveBg)
             .then(
                 if (onClick != null) {
                     Modifier.clickable(interactionSource = interactionSource, indication = null) { onClick() }
@@ -144,17 +159,23 @@ fun NeumorphicCard(
     }
 }
 
-// Botón Táctil Neumorphic con microinteracción de presión
+// Botón Táctil Neumorphic con microinteracción de presión y soporte Modo Oscuro
 @Composable
 fun NeumorphicButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 14.dp,
     elevation: Dp = 4.dp,
-    backgroundColor: Color = NeuSurface,
+    backgroundColor: Color = Color.Unspecified,
     contentColor: Color = TeqPrimary,
     content: @Composable RowScope.() -> Unit
 ) {
+    val isDark = LocalIsDarkTheme.current
+    val effectiveBg = if (backgroundColor != Color.Unspecified) backgroundColor else (if (isDark) NeuDarkSurface else NeuSurface)
+    val effectiveLightShadow = if (isDark) NeuDarkLightShadow else NeuLightShadow.copy(alpha = 0.85f)
+    val effectiveDarkShadow = if (isDark) NeuDarkDarkShadow else NeuDarkShadow.copy(alpha = 0.55f)
+    val effectivePressed = if (isDark) NeuDarkPressed else NeuPressed
+
     val shape = RoundedCornerShape(cornerRadius)
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -170,12 +191,14 @@ fun NeumorphicButton(
             .padding(elevation)
             .neumorphic(
                 cornerRadius = cornerRadius,
+                lightShadowColor = effectiveLightShadow,
+                darkShadowColor = effectiveDarkShadow,
                 offset = currentOffset,
                 blur = currentOffset * 2,
                 isPressed = isPressed
             )
             .clip(shape)
-            .background(if (isPressed) NeuPressed else backgroundColor)
+            .background(if (isPressed) effectivePressed else effectiveBg)
             .clickable(interactionSource = interactionSource, indication = null) { onClick() }
             .padding(horizontal = 20.dp, vertical = 14.dp),
         contentAlignment = Alignment.Center

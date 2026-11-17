@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+
+    <!-- Escudo / Base Neumórfica Redondeada con Sombra Proyectada -->
+    <path
+        android:pathData="M22,15 C14,15 8,21 8,29 L8,97 C8,105 14,111 22,111 L98,111 C106,111 112,105 112,97 L112,29 C112,21 106,15 98,15 Z"
+        android:fillColor="#20000000" />
+
+    <!-- Fondo de Tarjeta con Gradiente Azul Médico Profundo TEQMED -->
+    <path android:pathData="M20,10 C12,10 6,16 6,24 L6,96 C6,104 12,110 20,110 L100,110 C108,110 114,104 114,96 L114,24 C114,16 108,10 100,10 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="6"
+                android:startY="10"
+                android:endX="114"
+                android:endY="110"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#0056B3" />
+                <item android:offset="0.6" android:color="#003B7A" />
+                <item android:offset="1.0" android:color="#0A192F" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Borde Especular de Luz Lineal (Glassmorphism Light Border) -->
+    <path
+        android:pathData="M20,10 C12,10 6,16 6,24 L6,96 C6,104 12,110 20,110 L100,110 C108,110 114,104 114,96 L114,24 C114,16 108,10 100,10 Z"
+        android:strokeWidth="1.2"
+        android:strokeColor="#4000D2FF"
+        android:fillColor="#00000000" />
+
+    <!-- Cruz Médica TEQMED SpA -->
+    <path android:pathData="M52,28 C52,24 68,24 68,28 L68,48 L88,48 C92,48 92,64 88,64 L68,64 L68,84 C68,88 52,88 52,84 L52,64 L32,64 C28,64 28,48 32,48 L52,48 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="28"
+                android:startY="28"
+                android:endX="92"
+                android:endY="88"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FFFFFF" />
+                <item android:offset="0.5" android:color="#E1F5FE" />
+                <item android:offset="1.0" android:color="#B3E5FC" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Línea de Pulso Cardíaco / Precisión Biomédica (ECG) -->
+    <path
+        android:pathData="M 32,56 L 46,56 L 52,42 L 58,70 L 64,48 L 70,59 L 74,56 L 88,56"
+        android:strokeWidth="3.2"
+        android:strokeColor="#0056B3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+
+    <path
+        android:pathData="M 32,56 L 46,56 L 52,42 L 58,70 L 64,48 L 70,59 L 74,56 L 88,56"
+        android:strokeWidth="2.0"
+        android:strokeColor="#00E5FF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+
+    <!-- Medalla / Chip de Gastos en Terreno -->
+    <path
+        android:pathData="M 82,82 m -13,0 a 13,13 0 1,0 26,0 a 13,13 0 1,0 -26,0"
+        android:fillColor="#0A192F" />
+
+    <path android:pathData="M 82,82 m -11,0 a 11,11 0 1,0 22,0 a 11,11 0 1,0 -22,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="71"
+                android:startY="71"
+                android:endX="93"
+                android:endY="93"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FFD54F" />
+                <item android:offset="0.5" android:color="#FFB300" />
+                <item android:offset="1.0" android:color="#FF8F00" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <path
+        android:pathData="M82,75 L82,89 M78.5,78 C78.5,76.5 85,76 85,79.5 C85,82 78.5,81.5 78.5,84.5 C78.5,87.5 85.5,87 85.5,84.5"
+        android:strokeWidth="1.8"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+</vector>

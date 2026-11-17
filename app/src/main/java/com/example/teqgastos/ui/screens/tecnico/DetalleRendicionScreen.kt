@@ -1,5 +1,6 @@
 package com.example.teqgastos.ui.screens.tecnico
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,25 +25,40 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Hotel
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.LocalParking
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MedicalServices
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Toll
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -60,6 +77,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.teqgastos.data.local.entity.GastoEntity
 import com.example.teqgastos.model.EstadoGasto
@@ -67,17 +85,31 @@ import com.example.teqgastos.model.EstadoRendicion
 import com.example.teqgastos.model.FormaPago
 import com.example.teqgastos.ui.components.EstadoGastoBadge
 import com.example.teqgastos.ui.components.EstadoRendicionBadge
+import com.example.teqgastos.ui.components.SyncStatusBadge
 import com.example.teqgastos.ui.components.GlassmorphicButton
+import com.example.teqgastos.ui.components.GlassmorphicCard
 import com.example.teqgastos.ui.components.GlassmorphicExtendedFab
 import com.example.teqgastos.ui.components.NielsenHelpDialog
 import com.example.teqgastos.ui.components.NeumorphicCard
+import com.example.teqgastos.ui.components.TeqAuditTimelineDialog
 import com.example.teqgastos.ui.components.TeqConfirmationDialog
+import com.example.teqgastos.ui.components.TeqFondoSemaforoBar
+import com.example.teqgastos.ui.components.TeqGastosAnalyticsDialog
 import com.example.teqgastos.ui.components.formatClp
 import com.example.teqgastos.ui.theme.NeuBackground
+import com.example.teqgastos.ui.theme.neuBackgroundColor
 import com.example.teqgastos.ui.theme.TeqPrimary
 import com.example.teqgastos.ui.theme.TeqSecondary
 import com.example.teqgastos.ui.theme.TeqWarning
 import com.example.teqgastos.ui.viewmodel.TecnicoViewModel
+
+enum class OrdenGasto(val label: String) {
+    FECHA_DESC("Más recientes"),
+    FECHA_ASC("Más antiguos"),
+    MONTO_DESC("Mayor monto"),
+    MONTO_ASC("Menor monto"),
+    PROVEEDOR_ASC("Proveedor A-Z")
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,19 +120,28 @@ fun DetalleRendicionScreen(
     onNavigateToNuevoGasto: (Long) -> Unit,
     onNavigateToEditarGasto: (Long, Long) -> Unit,
     onNavigateToVisorFoto: (Long) -> Unit,
-    onNavigateToImportarTeqRuta: (Long) -> Unit
+    onNavigateToImportarTeqRuta: (Long) -> Unit,
+    onNavigateToMapa: (Long) -> Unit = {}
 ) {
     LaunchedEffect(rendicionId) {
         viewModel.loadRendicionDetalle(rendicionId)
     }
 
     val rendicionConGastos by viewModel.currentRendicionConGastos.collectAsState()
+    val auditorias by viewModel.getAuditoriaFlow(rendicionId).collectAsState(initial = emptyList())
     val snackbarHostState = remember { SnackbarHostState() }
     val uiMessage by viewModel.uiMessage.collectAsState()
 
     var gastoToDelete by remember { mutableStateOf<GastoEntity?>(null) }
     var showConfirmSendDialog by remember { mutableStateOf(false) }
     var showHelpDialog by remember { mutableStateOf(false) }
+    var showAnalyticsDialog by remember { mutableStateOf(false) }
+    var showTimelineDialog by remember { mutableStateOf(false) }
+    var showOverflowMenu by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedCategoria by remember { mutableStateOf<String?>(null) }
+    var selectedFormaPago by remember { mutableStateOf<FormaPago?>(null) }
+    var currentOrden by remember { mutableStateOf(OrdenGasto.FECHA_DESC) }
 
     LaunchedEffect(uiMessage) {
         uiMessage?.let {
@@ -146,8 +187,23 @@ fun DetalleRendicionScreen(
         )
     }
 
+    if (showAnalyticsDialog && rendicionConGastos != null) {
+        TeqGastosAnalyticsDialog(
+            gastos = rendicionConGastos!!.gastos,
+            onDismissRequest = { showAnalyticsDialog = false }
+        )
+    }
+
+    if (showTimelineDialog && rendicionConGastos != null) {
+        TeqAuditTimelineDialog(
+            auditorias = auditorias,
+            rendicionTitulo = rendicionConGastos!!.rendicion.titulo,
+            onDismissRequest = { showTimelineDialog = false }
+        )
+    }
+
     if (rendicionConGastos == null) {
-        Scaffold(containerColor = NeuBackground) { padding ->
+        Scaffold(containerColor = neuBackgroundColor()) { padding ->
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = TeqPrimary)
             }
@@ -159,23 +215,61 @@ fun DetalleRendicionScreen(
     val r = item.rendicion
     val isEditable = r.estado == EstadoRendicion.BORRADOR || r.estado == EstadoRendicion.OBSERVADA
 
+    val filteredAndSortedGastos = remember(
+        item.gastos,
+        searchQuery,
+        selectedCategoria,
+        selectedFormaPago,
+        currentOrden
+    ) {
+        var result = item.gastos
+
+        if (searchQuery.isNotBlank()) {
+            val q = searchQuery.trim().lowercase()
+            result = result.filter {
+                it.nombreProveedor.lowercase().contains(q) ||
+                it.categoriaNombre.lowercase().contains(q) ||
+                it.nroComprobante.lowercase().contains(q)
+            }
+        }
+
+        if (selectedCategoria != null) {
+            result = result.filter { it.categoriaNombre.equals(selectedCategoria, ignoreCase = true) }
+        }
+
+        if (selectedFormaPago != null) {
+            result = result.filter { it.formaPago == selectedFormaPago }
+        }
+
+        when (currentOrden) {
+            OrdenGasto.FECHA_DESC -> result.sortedByDescending { it.fechaGasto }
+            OrdenGasto.FECHA_ASC -> result.sortedBy { it.fechaGasto }
+            OrdenGasto.MONTO_DESC -> result.sortedByDescending { it.montoClp }
+            OrdenGasto.MONTO_ASC -> result.sortedBy { it.montoClp }
+            OrdenGasto.PROVEEDOR_ASC -> result.sortedBy { it.nombreProveedor.lowercase() }
+        }
+    }
+
     Scaffold(
-        containerColor = NeuBackground, // Fondo Neumorphic
+        containerColor = neuBackgroundColor(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
+                    Column(modifier = Modifier.fillMaxWidth().padding(end = 4.dp)) {
                         Text(
                             text = r.titulo,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            maxLines = 1
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "${r.centroCostoNombre} · ${r.fechaInicio}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 },
@@ -185,12 +279,51 @@ fun DetalleRendicionScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showHelpDialog = true }) {
-                        Icon(Icons.Default.HelpOutline, contentDescription = "Ayuda y Políticas", tint = TeqPrimary)
+                    EstadoRendicionBadge(estado = r.estado)
+                    Box {
+                        IconButton(onClick = { showOverflowMenu = !showOverflowMenu }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Más opciones", tint = TeqPrimary)
+                        }
+                        DropdownMenu(
+                            expanded = showOverflowMenu,
+                            onDismissRequest = { showOverflowMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Ver Tramos en Mapa") },
+                                leadingIcon = { Icon(Icons.Default.Map, contentDescription = null, tint = TeqPrimary) },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    onNavigateToMapa(rendicionId)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Análisis Financiero de Gastos") },
+                                leadingIcon = { Icon(Icons.Default.PieChart, contentDescription = null, tint = TeqPrimary) },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    showAnalyticsDialog = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Trazabilidad y Auditoría") },
+                                leadingIcon = { Icon(Icons.Default.History, contentDescription = null, tint = TeqPrimary) },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    showTimelineDialog = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Ayuda y Políticas") },
+                                leadingIcon = { Icon(Icons.Default.HelpOutline, contentDescription = null, tint = TeqPrimary) },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    showHelpDialog = true
+                                }
+                            )
+                        }
                     }
-                    EstadoRendicionBadge(estado = r.estado, modifier = Modifier.padding(end = 12.dp))
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = NeuBackground)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = neuBackgroundColor())
             )
         },
         floatingActionButton = {
@@ -266,12 +399,19 @@ fun DetalleRendicionScreen(
                     cornerRadius = 20.dp,
                     elevation = 6.dp
                 ) {
-                    Text(
-                        text = "Resumen de Rendición",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = TeqPrimary
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Resumen de Rendición",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TeqPrimary
+                        )
+                        EstadoRendicionBadge(estado = r.estado)
+                    }
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -332,6 +472,92 @@ fun DetalleRendicionScreen(
                 }
             }
 
+            // Acceso Rápido al Mapa de Tramos Recorridos
+            item {
+                GlassmorphicCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    cornerRadius = 16.dp,
+                    elevation = 4.dp,
+                    onClick = { onNavigateToMapa(rendicionId) }
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .background(TeqPrimary.copy(alpha = 0.12f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Map,
+                                contentDescription = null,
+                                tint = TeqPrimary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Ver Tramo Recorrido en Mapa",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = TeqPrimary
+                            )
+                            Text(
+                                text = "Trazado GPS interactivo, peajes y centros hospitalarios",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                }
+            }
+
+            // Semáforo de Anticipo y Fondo por Rendir
+            if (r.fondoInicial > 0) {
+                item {
+                    TeqFondoSemaforoBar(
+                        fondoInicial = r.fondoInicial,
+                        totalRendidoFondo = item.totalFondoRendirClp
+                    )
+                }
+            }
+
+            // Acceso Rápido a Utilidades Financieras
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    GlassmorphicButton(
+                        onClick = { showAnalyticsDialog = true },
+                        modifier = Modifier.weight(1f).height(46.dp),
+                        cornerRadius = 14.dp
+                    ) {
+                        Icon(Icons.Default.PieChart, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Gráficos", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+
+                    GlassmorphicButton(
+                        onClick = { showTimelineDialog = true },
+                        modifier = Modifier.weight(1f).height(46.dp),
+                        cornerRadius = 14.dp
+                    ) {
+                        Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Auditoría", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+            }
+
             if (item.tieneObservaciones) {
                 item {
                     NeumorphicCard(
@@ -354,14 +580,166 @@ fun DetalleRendicionScreen(
             }
 
             item {
-                Text(
-                    text = "Detalle de Gastos",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Detalle de Gastos",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${filteredAndSortedGastos.size} de ${item.gastos.size} gastos",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
             }
 
-            if (item.gastos.isEmpty()) {
+            if (item.gastos.isNotEmpty()) {
+                item {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Buscar en gastos (proveedor, folio, ítem)...") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TeqPrimary) },
+                        trailingIcon = {
+                            if (searchQuery.isNotBlank()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Limpiar búsqueda")
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                            focusedBorderColor = TeqPrimary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                        ),
+                        singleLine = true
+                    )
+                }
+
+                // Chips de Categorías
+                item {
+                    val categoriasDisponibles = remember(item.gastos) {
+                        item.gastos.map { it.categoriaNombre }.distinct().sorted()
+                    }
+                    if (categoriasDisponibles.size > 1) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FilterList,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Filtrar por categoría:",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            item {
+                                FilterChip(
+                                    selected = selectedCategoria == null,
+                                    onClick = { selectedCategoria = null },
+                                    label = { Text("Todas", style = MaterialTheme.typography.labelSmall) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = TeqPrimary,
+                                        selectedLabelColor = Color.White,
+                                        containerColor = MaterialTheme.colorScheme.surface,
+                                        labelColor = MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                            }
+                            items(categoriasDisponibles) { cat ->
+                                val isSelected = selectedCategoria == cat
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { selectedCategoria = if (isSelected) null else cat },
+                                    label = { Text(cat, style = MaterialTheme.typography.labelSmall) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = TeqPrimary,
+                                        selectedLabelColor = Color.White,
+                                        containerColor = MaterialTheme.colorScheme.surface,
+                                        labelColor = MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        enabled = true,
+                                        selected = isSelected,
+                                        borderColor = if (isSelected) TeqPrimary else MaterialTheme.colorScheme.outlineVariant
+                                    ),
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+
+                    // Fila de Ordenamiento
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Sort,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Ordenar por:",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(OrdenGasto.values()) { orden ->
+                            val isSelected = currentOrden == orden
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { currentOrden = orden },
+                                label = { Text(orden.label, style = MaterialTheme.typography.labelSmall) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = TeqPrimary,
+                                    selectedLabelColor = Color.White,
+                                    containerColor = MaterialTheme.colorScheme.surface,
+                                    labelColor = MaterialTheme.colorScheme.onSurface
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = isSelected,
+                                    borderColor = if (isSelected) TeqPrimary else MaterialTheme.colorScheme.outlineVariant
+                                ),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (filteredAndSortedGastos.isEmpty()) {
                 item {
                     Box(
                         modifier = Modifier
@@ -372,12 +750,28 @@ fun DetalleRendicionScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(48.dp))
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("Aún no has registrado gastos en esta rendición.", color = MaterialTheme.colorScheme.outline)
+                            Text(
+                                text = if (searchQuery.isNotBlank() || selectedCategoria != null) "No hay gastos que coincidan con los filtros aplicados." else "Aún no has registrado gastos en esta rendición.",
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                            if (searchQuery.isNotBlank() || selectedCategoria != null) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Restablecer filtros",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TeqPrimary,
+                                    modifier = Modifier.clickable {
+                                        searchQuery = ""
+                                        selectedCategoria = null
+                                    }
+                                )
+                            }
                         }
                     }
                 }
             } else {
-                items(item.gastos, key = { it.id }) { gasto ->
+                items(filteredAndSortedGastos, key = { it.id }) { gasto ->
                     NeumorphicGastoItemCard(
                         gasto = gasto,
                         isEditable = isEditable,
@@ -438,7 +832,13 @@ fun NeumorphicGastoItemCard(
                     Text("${gasto.fechaGasto} · ${gasto.nroComprobante}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                 }
             }
-            EstadoGastoBadge(estado = gasto.estadoGasto)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                SyncStatusBadge(status = gasto.syncStatus)
+                EstadoGastoBadge(estado = gasto.estadoGasto)
+            }
         }
 
         Spacer(modifier = Modifier.height(10.dp))

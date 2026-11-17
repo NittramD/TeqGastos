@@ -2,6 +2,7 @@ package com.example.teqgastos
 
 import android.app.Application
 import com.example.teqgastos.data.datastore.UserPreferences
+import com.example.teqgastos.data.security.TokenManager
 import com.example.teqgastos.data.repository.TeqGastosRepository
 import com.example.teqgastos.sync.SyncWorker
 import com.example.teqgastos.util.NetworkMonitor
@@ -19,6 +20,10 @@ class TeqGastosApp : Application() {
 
     val userPreferences: UserPreferences by lazy {
         UserPreferences(this)
+    }
+
+    val tokenManager: TokenManager by lazy {
+        TokenManager.getInstance(this)
     }
 
     val networkMonitor: NetworkMonitor by lazy {

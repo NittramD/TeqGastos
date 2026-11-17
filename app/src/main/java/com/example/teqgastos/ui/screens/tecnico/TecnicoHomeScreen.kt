@@ -28,10 +28,15 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.SwitchAccount
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -57,18 +62,33 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.example.teqgastos.data.local.entity.RendicionEntity
 import com.example.teqgastos.model.EstadoRendicion
+import com.example.teqgastos.model.SyncStatus
+import com.example.teqgastos.model.UserRole
+import com.example.teqgastos.sync.SyncEngineState
+import com.example.teqgastos.ui.components.AccountSwitcherDialog
 import com.example.teqgastos.ui.components.EstadoRendicionBadge
+import com.example.teqgastos.ui.components.SyncStatusBadge
 import com.example.teqgastos.ui.components.GlassmorphicExtendedFab
 import com.example.teqgastos.ui.components.GlassmorphicFilterChip
 import com.example.teqgastos.ui.components.NielsenHelpDialog
 import com.example.teqgastos.ui.components.NeumorphicCard
 import com.example.teqgastos.ui.components.NeumorphicMetricCard
 import com.example.teqgastos.ui.components.OfflineNoticeBanner
+import com.example.teqgastos.ui.components.ShimmerRendicionCard
+import com.example.teqgastos.ui.components.TeqConfirmationDialog
 import com.example.teqgastos.ui.components.formatClp
-import com.example.teqgastos.ui.theme.NeuBackground
+import com.example.teqgastos.ui.theme.neuBackgroundColor
 import com.example.teqgastos.ui.theme.TeqPrimary
 import com.example.teqgastos.ui.viewmodel.TecnicoViewModel
 import com.example.teqgastos.util.NetworkMonitor
+
+enum class OrdenRendicion(val label: String) {
+    FECHA_DESC("Más recientes"),
+    FECHA_ASC("Más antiguas"),
+    MONTO_DESC("Mayor fondo"),
+    MONTO_ASC("Menor fondo"),
+    TITULO_ASC("Título A-Z")
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,16 +97,27 @@ fun TecnicoHomeScreen(
     networkMonitor: NetworkMonitor,
     onNavigateToNuevaRendicion: () -> Unit,
     onNavigateToDetalle: (Long) -> Unit,
-    onLogout: () -> Unit
+    onNavigateToConfiguraciones: () -> Unit,
+    onLogout: () -> Unit,
+    onSwitchAccount: ((UserRole) -> Unit)? = null
 ) {
     val rendiciones by viewModel.rendiciones.collectAsState()
     val isOnlineReal by networkMonitor.isOnlineFlow.collectAsState(initial = true)
     var manualOfflineToggle by remember { mutableStateOf(false) }
 
+    val syncState by viewModel.syncState.collectAsState()
+    val pendingGastosCount by viewModel.pendingGastosCount.collectAsState(initial = 0)
+    val isSyncing = syncState is SyncEngineState.Syncing
+    val syncProgress = (syncState as? SyncEngineState.Syncing)?.progress
+    val syncItem = (syncState as? SyncEngineState.Syncing)?.item
+
     val isEffectiveOffline = !isOnlineReal || manualOfflineToggle
     var selectedFilter by remember { mutableStateOf<EstadoRendicion?>(null) }
+    var currentOrden by remember { mutableStateOf(OrdenRendicion.FECHA_DESC) }
     var searchQuery by remember { mutableStateOf("") }
     var showHelpDialog by remember { mutableStateOf(false) }
+    var showAccountSwitcherDialog by remember { mutableStateOf(false) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val uiMessage by viewModel.uiMessage.collectAsState()
@@ -98,13 +129,20 @@ fun TecnicoHomeScreen(
         }
     }
 
-    val filteredList = remember(rendiciones, selectedFilter, searchQuery) {
-        rendiciones.filter { r ->
+    val processedList = remember(rendiciones, selectedFilter, searchQuery, currentOrden) {
+        val filtered = rendiciones.filter { r ->
             val matchFilter = selectedFilter == null || r.estado == selectedFilter
             val matchSearch = searchQuery.isBlank() ||
                     r.titulo.contains(searchQuery, ignoreCase = true) ||
                     r.centroCostoNombre.contains(searchQuery, ignoreCase = true)
             matchFilter && matchSearch
+        }
+        when (currentOrden) {
+            OrdenRendicion.FECHA_DESC -> filtered.sortedByDescending { it.fechaInicio }
+            OrdenRendicion.FECHA_ASC -> filtered.sortedBy { it.fechaInicio }
+            OrdenRendicion.MONTO_DESC -> filtered.sortedByDescending { it.fondoInicial }
+            OrdenRendicion.MONTO_ASC -> filtered.sortedBy { it.fondoInicial }
+            OrdenRendicion.TITULO_ASC -> filtered.sortedBy { it.titulo.lowercase() }
         }
     }
 
@@ -112,8 +150,39 @@ fun TecnicoHomeScreen(
         NielsenHelpDialog(onDismissRequest = { showHelpDialog = false })
     }
 
+    if (showAccountSwitcherDialog) {
+        AccountSwitcherDialog(
+            currentRole = UserRole.TECNICO,
+            onSelectRole = { role ->
+                showAccountSwitcherDialog = false
+                onSwitchAccount?.invoke(role)
+            },
+            onLogoutToLogin = {
+                showAccountSwitcherDialog = false
+                onLogout()
+            },
+            onDismissRequest = { showAccountSwitcherDialog = false }
+        )
+    }
+
+    if (showLogoutDialog) {
+        TeqConfirmationDialog(
+            title = "¿Cerrar Sesión?",
+            message = "¿Deseas cerrar la sesión activa de Gerardo Galán (Técnico de Terreno)? Se revocarán los tokens de acceso y volverás a la pantalla de ingreso.",
+            confirmText = "Cerrar Sesión",
+            cancelText = "Cancelar",
+            isDestructive = true,
+            icon = Icons.AutoMirrored.Filled.Logout,
+            onConfirm = {
+                showLogoutDialog = false
+                onLogout()
+            },
+            onDismiss = { showLogoutDialog = false }
+        )
+    }
+
     Scaffold(
-        containerColor = NeuBackground, // Fondo Neumórfico suave
+        containerColor = neuBackgroundColor(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column {
@@ -159,17 +228,41 @@ fun TecnicoHomeScreen(
                                 tint = TeqPrimary
                             )
                         }
-                        IconButton(onClick = onLogout) {
+                        // Cambiar de Cuenta / Rol
+                        IconButton(onClick = { showAccountSwitcherDialog = true }) {
+                            Icon(
+                                imageVector = Icons.Default.SwitchAccount,
+                                contentDescription = "Cambiar de Cuenta",
+                                tint = TeqPrimary
+                            )
+                        }
+                        // Configuraciones y Modo Oscuro
+                        IconButton(onClick = onNavigateToConfiguraciones) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Configuración",
+                                tint = TeqPrimary
+                            )
+                        }
+                        // Cerrar Sesión con Diálogo de Prevención de Errores (Heurística Nielsen #5)
+                        IconButton(onClick = { showLogoutDialog = true }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Logout,
-                                contentDescription = "Cambiar Rol / Salir",
+                                contentDescription = "Cerrar Sesión",
                                 tint = MaterialTheme.colorScheme.outline
                             )
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = NeuBackground)
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = neuBackgroundColor())
                 )
-                OfflineNoticeBanner(isOffline = isEffectiveOffline)
+                OfflineNoticeBanner(
+                    isOffline = isEffectiveOffline,
+                    isSyncing = isSyncing,
+                    syncProgress = syncProgress,
+                    syncItem = syncItem,
+                    pendingCount = pendingGastosCount,
+                    onSyncClick = { viewModel.sincronizarManual() }
+                )
             }
         },
         // Botón FAB Flotante Exclusivo con Efecto Glassmorphism (Vidrio Esmerilado)
@@ -253,10 +346,10 @@ fun TecnicoHomeScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White.copy(alpha = 0.9f),
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
                         focusedBorderColor = TeqPrimary,
-                        unfocusedBorderColor = Color(0xFFD5DFEC)
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
                     ),
                     singleLine = true
                 )
@@ -276,7 +369,7 @@ fun TecnicoHomeScreen(
                     )
                     if (searchQuery.isNotBlank() || selectedFilter != null) {
                         Text(
-                            text = "${filteredList.size} resultado(s)",
+                            text = "${processedList.size} resultado(s)",
                             style = MaterialTheme.typography.labelSmall,
                             color = TeqPrimary
                         )
@@ -305,10 +398,62 @@ fun TecnicoHomeScreen(
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Fila de Ordenamiento
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Sort,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Ordenar por:",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(OrdenRendicion.values()) { orden ->
+                        val isSelected = currentOrden == orden
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { currentOrden = orden },
+                            label = { Text(orden.label, style = MaterialTheme.typography.labelSmall) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = TeqPrimary,
+                                selectedLabelColor = Color.White,
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                labelColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = isSelected,
+                                borderColor = if (isSelected) TeqPrimary else MaterialTheme.colorScheme.outlineVariant
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                    }
+                }
             }
 
             // Lista de Rendiciones con Tarjetas Neumórficas (Relieve suave)
-            if (filteredList.isEmpty()) {
+            if (isSyncing && rendiciones.isEmpty()) {
+                items(3) {
+                    ShimmerRendicionCard()
+                }
+            } else if (processedList.isEmpty()) {
                 item {
                     Box(
                         modifier = Modifier
@@ -322,7 +467,7 @@ fun TecnicoHomeScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.outline
                             )
-                            if (searchQuery.isNotBlank()) {
+                            if (searchQuery.isNotBlank() || selectedFilter != null) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = "Restablecer filtros",
@@ -339,7 +484,7 @@ fun TecnicoHomeScreen(
                     }
                 }
             } else {
-                items(filteredList, key = { it.id }) { rendicion ->
+                items(processedList, key = { it.id }) { rendicion ->
                     NeumorphicRendicionCardItem(
                         rendicion = rendicion,
                         onClick = { onNavigateToDetalle(rendicion.id) }
@@ -394,7 +539,15 @@ fun NeumorphicRendicionCardItem(
                     )
                 }
             }
-            EstadoRendicionBadge(estado = rendicion.estado)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                if (rendicion.syncStatus != SyncStatus.SYNCED) {
+                    SyncStatusBadge(status = rendicion.syncStatus)
+                }
+                EstadoRendicionBadge(estado = rendicion.estado)
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))

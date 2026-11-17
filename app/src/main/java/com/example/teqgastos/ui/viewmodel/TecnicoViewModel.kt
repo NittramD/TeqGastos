@@ -11,6 +11,8 @@ import com.example.teqgastos.data.repository.TeqGastosRepository
 import com.example.teqgastos.model.EstadoGasto
 import com.example.teqgastos.model.EstadoRendicion
 import com.example.teqgastos.model.FormaPago
+import com.example.teqgastos.model.TrasladoTeqRuta
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,14 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-data class TrasladoTeqRuta(
-    val id: String,
-    val tramo: String,
-    val kilometros: Double,
-    val peajesClp: Double,
-    val combustibleClp: Double,
-    val fecha: String
-)
+typealias TrasladoTeqRuta = com.example.teqgastos.model.TrasladoTeqRuta
 
 class TecnicoViewModel(private val repository: TeqGastosRepository) : ViewModel() {
 
@@ -40,6 +35,10 @@ class TecnicoViewModel(private val repository: TeqGastosRepository) : ViewModel(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
+
+    // Estado reactivo de persistencia y sincronización (Fase 2)
+    val syncState: StateFlow<com.example.teqgastos.sync.SyncEngineState> = repository.syncStateFlow
+    val pendingGastosCount: Flow<Int> = repository.pendingGastosCountFlow
 
     private val _currentRendicionConGastos = MutableStateFlow<RendicionConGastos?>(null)
     val currentRendicionConGastos: StateFlow<RendicionConGastos?> = _currentRendicionConGastos.asStateFlow()
@@ -121,9 +120,18 @@ class TecnicoViewModel(private val repository: TeqGastosRepository) : ViewModel(
 
     fun sincronizarManual() {
         viewModelScope.launch {
-            repository.sincronizarGastosPendientes()
-            repository.refrescarIndicadores()
-            _uiMessage.value = "Sincronización completada con éxito."
+            val result = repository.forzarSincronizacionManual()
+            if (result.isSuccess) {
+                val summary = result.getOrNull()
+                val total = (summary?.gastosSincronizados ?: 0) + (summary?.rendicionesSincronizadas ?: 0)
+                _uiMessage.value = if (total > 0) {
+                    "Sincronización completada ($total elementos sincronizados con el ERP)."
+                } else {
+                    "Todos los registros ya se encuentran sincronizados."
+                }
+            } else {
+                _uiMessage.value = "Error al sincronizar: ${result.exceptionOrNull()?.message}"
+            }
         }
     }
 
@@ -188,6 +196,10 @@ class TecnicoViewModel(private val repository: TeqGastosRepository) : ViewModel(
             _uiMessage.value = "Se importaron ${gastosNuevos.size} gastos desde TeqRuta."
             onSuccess()
         }
+    }
+
+    fun getAuditoriaFlow(rendicionId: Long): kotlinx.coroutines.flow.Flow<List<com.example.teqgastos.data.local.entity.AuditoriaEntity>> {
+        return repository.getAuditoriaFlow(rendicionId)
     }
 
     class Factory(private val repository: TeqGastosRepository) : ViewModelProvider.Factory {

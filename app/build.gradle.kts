@@ -63,6 +63,20 @@ dependencies {
     // WorkManager para Sincronización en Segundo Plano
     implementation(libs.androidx.work.runtime.ktx)
 
+    // Seguridad: Keystore y Biometría
+    implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.biometric)
+
+    // Networking: Retrofit & OkHttp
+    implementation(libs.retrofit.core)
+    implementation(libs.retrofit.converter.gson)
+    implementation(libs.okhttp.core)
+    implementation(libs.okhttp.logging)
+
+    // Hardware: Location y ML Kit Text Recognition (OCR)
+    implementation(libs.play.services.location)
+    implementation(libs.mlkit.text.recognition)
+
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

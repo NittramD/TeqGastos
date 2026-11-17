@@ -13,8 +13,13 @@ import com.example.teqgastos.data.remote.IndicadoresValores
 import com.example.teqgastos.model.EstadoGasto
 import com.example.teqgastos.model.EstadoRendicion
 import com.example.teqgastos.model.FormaPago
+import com.example.teqgastos.model.SyncStatus
+import com.example.teqgastos.sync.SyncEngine
+import com.example.teqgastos.sync.SyncEngineState
+import com.example.teqgastos.sync.SyncSummary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -25,6 +30,12 @@ class TeqGastosRepository(context: Context) {
     private val gastoDao = db.gastoDao()
     private val catalogDao = db.catalogDao()
     private val auditoriaDao = db.auditoriaDao()
+
+    // Motor de Sincronización Outbox Pattern
+    private val syncEngine = SyncEngine.getInstance(context)
+    val syncStateFlow: StateFlow<SyncEngineState> = syncEngine.syncState
+    val pendingGastosCountFlow: Flow<Int> = gastoDao.countGastosPendientes()
+    val pendingRendicionesCountFlow: Flow<Int> = rendicionDao.countRendicionesPendientes()
 
     @Volatile
     var indicadoresActuales: IndicadoresValores = IndicadoresValores()
@@ -71,7 +82,8 @@ class TeqGastosRepository(context: Context) {
                     centroCostoId = 5,
                     centroCostoNombre = "Hospital Víctor Ríos Ruiz",
                     fondoInicial = 80000.0,
-                    estado = EstadoRendicion.BORRADOR
+                    estado = EstadoRendicion.BORRADOR,
+                    syncStatus = SyncStatus.SYNCED
                 )
             )
             registrarAuditoriaInterna(idR1, "Gerardo Galán", "17.482.913-K", "CREACION", "Creación de rendición en borrador.")
@@ -89,6 +101,7 @@ class TeqGastosRepository(context: Context) {
                     nroComprobante = "BOL-104921",
                     fechaGasto = "2026-10-18",
                     isSynced = true,
+                    syncStatus = SyncStatus.SYNCED,
                     estadoGasto = EstadoGasto.REGISTRADO
                 )
             )
@@ -104,7 +117,8 @@ class TeqGastosRepository(context: Context) {
                     centroCostoId = 2,
                     centroCostoNombre = "Hospital Las Higueras",
                     fondoInicial = 50000.0,
-                    estado = EstadoRendicion.ENVIADA
+                    estado = EstadoRendicion.ENVIADA,
+                    syncStatus = SyncStatus.SYNCED
                 )
             )
             registrarAuditoriaInterna(idR2, "Carlos Mendoza", "16.291.844-5", "CREACION", "Creación de rendición.")
@@ -123,6 +137,7 @@ class TeqGastosRepository(context: Context) {
                     nroComprobante = "FAC-901844",
                     fechaGasto = "2026-10-14",
                     isSynced = true,
+                    syncStatus = SyncStatus.SYNCED,
                     estadoGasto = EstadoGasto.REGISTRADO
                 )
             )
@@ -176,40 +191,104 @@ class TeqGastosRepository(context: Context) {
     fun getRendicionesByEstados(estados: List<EstadoRendicion>): Flow<List<RendicionConGastos>> =
         rendicionDao.getRendicionesByEstadosFlow(estados)
 
-    suspend fun createRendicion(rendicion: RendicionEntity): Long {
-        val id = rendicionDao.insertRendicion(rendicion)
-        registrarAuditoria(id, rendicion.tecnicoNombre, rendicion.tecnicoRut, "CREACION", "Creación inicial de la comisión.")
-        return id
+    suspend fun createRendicion(rendicion: RendicionEntity): Long = withContext(Dispatchers.IO) {
+        val rendicionConSync = rendicion.copy(
+            syncStatus = SyncStatus.PENDING_INSERT,
+            lastModified = System.currentTimeMillis()
+        )
+        val id = rendicionDao.insertRendicion(rendicionConSync)
+        registrarAuditoriaInterna(id, rendicion.tecnicoNombre, rendicion.tecnicoRut, "CREACION", "Creación inicial de la comisión.")
+        id
     }
 
-    suspend fun updateRendicion(rendicion: RendicionEntity) = rendicionDao.updateRendicion(rendicion)
-    suspend fun updateEstadoRendicion(id: Long, estado: EstadoRendicion) = rendicionDao.updateEstadoRendicion(id, estado)
-    suspend fun deleteRendicion(rendicion: RendicionEntity) = rendicionDao.deleteRendicion(rendicion)
+    suspend fun updateRendicion(rendicion: RendicionEntity) = withContext(Dispatchers.IO) {
+        val rendicionConSync = rendicion.copy(
+            syncStatus = SyncStatus.PENDING_UPDATE,
+            lastModified = System.currentTimeMillis()
+        )
+        rendicionDao.updateRendicion(rendicionConSync)
+    }
+
+    suspend fun updateEstadoRendicion(id: Long, estado: EstadoRendicion) = withContext(Dispatchers.IO) {
+        rendicionDao.updateEstadoRendicion(id, estado)
+        rendicionDao.updateSyncStatus(id, SyncStatus.PENDING_UPDATE, System.currentTimeMillis())
+    }
+
+    suspend fun deleteRendicion(rendicion: RendicionEntity) = withContext(Dispatchers.IO) {
+        rendicionDao.deleteRendicion(rendicion)
+    }
 
     // Gastos
     fun getGastosByRendicion(rendicionId: Long): Flow<List<GastoEntity>> = gastoDao.getGastosByRendicionFlow(rendicionId)
     suspend fun getGastoById(id: Long): GastoEntity? = gastoDao.getGastoById(id)
     fun getGastoByIdFlow(id: Long): Flow<GastoEntity?> = gastoDao.getGastoByIdFlow(id)
-    suspend fun saveGasto(gasto: GastoEntity): Long {
-        return if (gasto.id == 0L) {
-            gastoDao.insertGasto(gasto)
+
+    suspend fun saveGasto(gasto: GastoEntity): Long = withContext(Dispatchers.IO) {
+        val targetSyncStatus = if (gasto.id == 0L) SyncStatus.PENDING_INSERT else SyncStatus.PENDING_UPDATE
+        val now = System.currentTimeMillis()
+        val gastoConSync = gasto.copy(
+            syncStatus = targetSyncStatus,
+            isSynced = false,
+            lastModified = now
+        )
+        if (gastoConSync.id == 0L) {
+            gastoDao.insertGasto(gastoConSync)
         } else {
-            gastoDao.updateGasto(gasto)
-            gasto.id
+            gastoDao.updateGasto(gastoConSync)
+            gastoConSync.id
         }
     }
-    suspend fun insertGastos(gastos: List<GastoEntity>) = gastoDao.insertGastos(gastos)
-    suspend fun deleteGasto(gasto: GastoEntity) = gastoDao.deleteGasto(gasto)
+
+    suspend fun insertGastos(gastos: List<GastoEntity>) = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        val gastosConSync = gastos.map {
+            it.copy(
+                syncStatus = SyncStatus.PENDING_INSERT,
+                isSynced = false,
+                lastModified = now
+            )
+        }
+        gastoDao.insertGastos(gastosConSync)
+    }
+
+    suspend fun deleteGasto(gasto: GastoEntity) = withContext(Dispatchers.IO) {
+        if (gasto.syncStatus == SyncStatus.PENDING_INSERT) {
+            // No existe aún en el backend central, eliminar inmediatamente
+            gastoDao.deleteGasto(gasto)
+        } else {
+            // Existe en backend: marcar como PENDING_DELETE para que SyncEngine notifique al ERP
+            gastoDao.updateSyncStatus(
+                id = gasto.id,
+                syncStatus = SyncStatus.PENDING_DELETE,
+                lastModified = System.currentTimeMillis(),
+                isSynced = false
+            )
+        }
+    }
+
     suspend fun checkDuplicado(rut: String, folio: String, currentId: Long = 0): Boolean {
         if (rut.isBlank() || folio.isBlank()) return false
         return gastoDao.findDuplicado(rut.trim(), folio.trim(), currentId) != null
     }
 
-    suspend fun updateEstadoGasto(id: Long, nuevoEstado: EstadoGasto, observacion: String? = null) {
+    suspend fun updateEstadoGasto(id: Long, nuevoEstado: EstadoGasto, observacion: String? = null) = withContext(Dispatchers.IO) {
         gastoDao.updateEstadoGasto(id, nuevoEstado, observacion)
+        gastoDao.updateSyncStatus(id, SyncStatus.PENDING_UPDATE, System.currentTimeMillis(), isSynced = false)
     }
 
-    suspend fun sincronizarGastosPendientes() = withContext(Dispatchers.IO) {
-        gastoDao.marcarTodosSincronizados()
+    /**
+     * Fuerza la sincronización manual inmediata a través del SyncEngine.
+     */
+    suspend fun forzarSincronizacionManual(): Result<SyncSummary> = withContext(Dispatchers.IO) {
+        val result = syncEngine.sincronizarTodo()
+        if (result.isSuccess) {
+            refrescarIndicadores()
+        }
+        result
     }
+
+    /**
+     * Compatibilidad con llamadas previas.
+     */
+    suspend fun sincronizarGastosPendientes(): Result<SyncSummary> = forzarSincronizacionManual()
 }

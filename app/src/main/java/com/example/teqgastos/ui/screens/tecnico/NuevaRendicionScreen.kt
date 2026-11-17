@@ -19,6 +19,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material3.Button
@@ -53,6 +55,7 @@ import com.example.teqgastos.ui.components.NielsenHelpDialog
 import com.example.teqgastos.ui.components.TeqConfirmationDialog
 import com.example.teqgastos.ui.theme.NeuBackground
 import com.example.teqgastos.ui.theme.TeqPrimary
+import com.example.teqgastos.ui.theme.TeqSuccess
 import com.example.teqgastos.ui.viewmodel.TecnicoViewModel
 import java.time.LocalDate
 
@@ -158,6 +161,13 @@ fun NuevaRendicionScreen(
                     label = { Text("Título / Motivo de la Comisión *") },
                     placeholder = { Text("Ej: Mantención Tomógrafo Hospital Las Higueras") },
                     isError = tituloError != null,
+                    trailingIcon = {
+                        if (tituloError != null) {
+                            Icon(Icons.Default.Error, contentDescription = "Error título", tint = MaterialTheme.colorScheme.error)
+                        } else if (titulo.trim().length >= 5) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = "Título válido", tint = TeqSuccess)
+                        }
+                    },
                     supportingText = { tituloError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)

@@ -1,6 +1,7 @@
 package com.example.teqgastos.ui.navigation
 
 sealed class Screen(val route: String) {
+    object Splash : Screen("splash")
     object Login : Screen("login")
     
     // Rutas Técnico
@@ -15,6 +16,15 @@ sealed class Screen(val route: String) {
     object ImportarTeqRuta : Screen("importar_teqruta/{rendicionId}") {
         fun createRoute(rendicionId: Long) = "importar_teqruta/$rendicionId"
     }
+    object MapaRuta : Screen("mapa_ruta/{rendicionId}?tramoId={tramoId}") {
+        fun createRoute(rendicionId: Long, tramoId: String? = null): String {
+            return if (tramoId != null) {
+                "mapa_ruta/$rendicionId?tramoId=$tramoId"
+            } else {
+                "mapa_ruta/$rendicionId"
+            }
+        }
+    }
 
     // Rutas Supervisor
     object SupervisorBandeja : Screen("supervisor_bandeja")
@@ -26,8 +36,9 @@ sealed class Screen(val route: String) {
     object FinanzasBandeja : Screen("finanzas_bandeja")
     object ExportarErp : Screen("exportar_erp")
 
-    // Ruta Común
+    // Rutas Comunes
     object VisorComprobante : Screen("visor_comprobante/{gastoId}") {
         fun createRoute(gastoId: Long) = "visor_comprobante/$gastoId"
     }
+    object Configuraciones : Screen("configuraciones")
 }

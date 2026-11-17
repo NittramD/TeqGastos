@@ -35,10 +35,14 @@ data class GastoFormState(
     val formaPago: FormaPago = FormaPago.REEMBOLSO_PROPIO,
     val fotoComprobanteUri: String? = null,
     val justificacionTope: String = "",
+    val ubicacionGps: String? = null,
+    val ocrAutocompletado: Boolean = false,
     
     // Errores y validaciones reactivas
     val rutError: String? = null,
     val montoError: String? = null,
+    val nombreProveedorError: String? = null,
+    val nroComprobanteError: String? = null,
     val fechaError: String? = null,
     val duplicadoError: String? = null,
     val justificacionError: String? = null,
@@ -62,6 +66,8 @@ data class GastoFormState(
                 montoNumero > 0 &&
                 montoError == null &&
                 rutError == null &&
+                nombreProveedorError == null &&
+                nroComprobanteError == null &&
                 fechaError == null &&
                 duplicadoError == null &&
                 nombreProveedor.isNotBlank() &&
@@ -162,11 +168,21 @@ class GastoFormViewModel(
     }
 
     fun onNombreProveedorChanged(nombre: String) {
-        _formState.value = _formState.value.copy(nombreProveedor = nombre)
+        val error = if (nombre.isNotBlank() && nombre.trim().length < 3) {
+            "Razón social demasiado corta (mínimo 3 caracteres)"
+        } else {
+            null
+        }
+        _formState.value = _formState.value.copy(nombreProveedor = nombre, nombreProveedorError = error)
     }
 
     fun onNroComprobanteChanged(nro: String) {
-        _formState.value = _formState.value.copy(nroComprobante = nro)
+        val error = if (nro.isNotBlank() && nro.trim().isEmpty()) {
+            "El número de comprobante es requerido"
+        } else {
+            null
+        }
+        _formState.value = _formState.value.copy(nroComprobante = nro, nroComprobanteError = error)
         checkDuplicadoAsync()
     }
 
@@ -193,12 +209,111 @@ class GastoFormViewModel(
         }
     }
 
+    /**
+     * Valida integralmente todos los campos del formulario.
+     * Retorna true si todo es válido, o false iluminando los errores correspondientes (IE 2.1.1).
+     */
+    fun validateAllFields(): Boolean {
+        val state = _formState.value
+        val montoErr = when {
+            state.montoInput.isBlank() -> "El monto es obligatorio."
+            state.montoNumero <= 0 -> "Ingrese un monto mayor a $0."
+            else -> state.montoError
+        }
+        val rutErr = when {
+            state.rutProveedor.isBlank() -> "El RUT del emisor es obligatorio."
+            !RutValidator.isValid(state.rutProveedor) -> "RUT inválido (revise dígito verificador)."
+            else -> null
+        }
+        val nombreErr = when {
+            state.nombreProveedor.isBlank() -> "El nombre o razón social es obligatorio."
+            state.nombreProveedor.trim().length < 3 -> "Debe contener al menos 3 caracteres."
+            else -> null
+        }
+        val nroErr = when {
+            state.nroComprobante.isBlank() -> "El número de boleta o folio es obligatorio."
+            else -> state.duplicadoError
+        }
+        val compErr = if (state.categoria?.requiereComprobante == true && state.fotoComprobanteUri == null) {
+            "Debe capturar o adjuntar fotografía del comprobante."
+        } else null
+
+        val justErr = if (state.isTopeExcedido && state.justificacionTope.trim().length < 10) {
+            "El gasto supera el tope. Justificación obligatoria (mínimo 10 caracteres)."
+        } else null
+
+        _formState.value = state.copy(
+            montoError = montoErr,
+            rutError = rutErr,
+            nombreProveedorError = nombreErr,
+            nroComprobanteError = nroErr,
+            comprobanteError = compErr,
+            justificacionError = justErr
+        )
+
+        val isValid = state.categoria != null &&
+                montoErr == null &&
+                rutErr == null &&
+                nombreErr == null &&
+                nroErr == null &&
+                state.fechaError == null &&
+                compErr == null &&
+                justErr == null
+
+        if (!isValid && _formState.value.errorMessage == null) {
+            _formState.value = _formState.value.copy(errorMessage = "Revise los campos marcados en rojo.")
+        }
+        return isValid
+    }
+
     fun onFormaPagoChanged(forma: FormaPago) {
         _formState.value = _formState.value.copy(formaPago = forma)
     }
 
     fun onFotoCaptured(uriString: String) {
         _formState.value = _formState.value.copy(fotoComprobanteUri = uriString, comprobanteError = null)
+    }
+
+    fun onUbicacionGpsChanged(ubicacion: String?) {
+        _formState.value = _formState.value.copy(ubicacionGps = ubicacion)
+    }
+
+    fun applyOcrResult(
+        rut: String?,
+        nombre: String?,
+        folio: String?,
+        monto: Double?,
+        fecha: String?
+    ) {
+        var current = _formState.value
+        if (!rut.isNullOrBlank()) {
+            val formatted = RutValidator.formatRut(rut)
+            val error = if (formatted.length >= 8 && !RutValidator.isValid(formatted)) {
+                "RUT inválido (revise dígito verificador)"
+            } else null
+            current = current.copy(rutProveedor = formatted, rutError = error)
+        }
+        if (!nombre.isNullOrBlank()) {
+            current = current.copy(nombreProveedor = nombre, nombreProveedorError = null)
+        }
+        if (!folio.isNullOrBlank()) {
+            current = current.copy(nroComprobante = folio, nroComprobanteError = null)
+        }
+        if (monto != null && monto > 0) {
+            val cleanMonto = monto.toLong().toString()
+            current = current.copy(montoInput = cleanMonto, montoError = null)
+        }
+        if (!fecha.isNullOrBlank()) {
+            current = current.copy(fechaGasto = fecha)
+            validarFecha(fecha)
+        }
+        _formState.value = current.copy(ocrAutocompletado = true)
+        validateTope()
+        checkDuplicadoAsync()
+    }
+
+    fun dismissOcrBanner() {
+        _formState.value = _formState.value.copy(ocrAutocompletado = false)
     }
 
     fun onJustificacionChanged(justificacion: String) {
@@ -251,6 +366,11 @@ class GastoFormViewModel(
             _formState.value = state.copy(isSaving = true)
             try {
                 val categoria = state.categoria ?: return@launch
+                val finalNombre = if (!state.ubicacionGps.isNullOrBlank() && !state.nombreProveedor.contains(state.ubicacionGps)) {
+                    "${state.nombreProveedor.trim()} [GPS: ${state.ubicacionGps}]"
+                } else {
+                    state.nombreProveedor.trim()
+                }
                 val gasto = GastoEntity(
                     id = state.gastoId,
                     rendicionId = rendicionId,
@@ -262,11 +382,12 @@ class GastoFormViewModel(
                     tipoCambio = state.tasaConversion,
                     formaPago = state.formaPago,
                     rutProveedor = state.rutProveedor.trim(),
-                    nombreProveedor = state.nombreProveedor.trim(),
+                    nombreProveedor = finalNombre,
                     nroComprobante = state.nroComprobante.trim(),
                     fechaGasto = state.fechaGasto,
                     fotoComprobanteUri = state.fotoComprobanteUri,
                     justificacionTope = if (state.isTopeExcedido) state.justificacionTope.trim() else null,
+                    origenTeqRuta = !state.ubicacionGps.isNullOrBlank(),
                     isSynced = false, // Pendiente de sincronización automática
                     estadoGasto = EstadoGasto.REGISTRADO
                 )

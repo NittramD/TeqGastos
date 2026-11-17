@@ -4,6 +4,7 @@ import androidx.room.TypeConverter
 import com.example.teqgastos.model.EstadoGasto
 import com.example.teqgastos.model.EstadoRendicion
 import com.example.teqgastos.model.FormaPago
+import com.example.teqgastos.model.SyncStatus
 import com.example.teqgastos.model.TipoMoneda
 
 class Converters {
@@ -45,5 +46,15 @@ class Converters {
         TipoMoneda.valueOf(value)
     } catch (e: Exception) {
         TipoMoneda.CLP
+    }
+
+    @TypeConverter
+    fun fromSyncStatus(value: SyncStatus): String = value.name
+
+    @TypeConverter
+    fun toSyncStatus(value: String): SyncStatus = try {
+        SyncStatus.valueOf(value)
+    } catch (e: Exception) {
+        SyncStatus.SYNCED
     }
 }

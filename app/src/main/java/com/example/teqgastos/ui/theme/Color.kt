@@ -17,13 +17,21 @@ val TeqOnSecondaryContainer = Color(0xFF001F24)
 val TeqTertiary = Color(0xFF525F70)
 val TeqTertiaryContainer = Color(0xFFD5E3F7)
 
-// Tokens Neumorphic
+// Tokens Neumorphic (Modo Claro)
 val NeuBackground = Color(0xFFE8EEF5)
 val NeuSurface = Color(0xFFE8EEF5)
 val NeuLightShadow = Color(0xFFFFFFFF)
 val NeuDarkShadow = Color(0xFFA6B7CD)
 val NeuPressed = Color(0xFFDEE5EF)
 val NeuBorder = Color(0xFFD5DFEC)
+
+// Tokens Neumorphic (Modo Oscuro)
+val NeuDarkBackground = Color(0xFF0F172A)     // Slate 900
+val NeuDarkSurface = Color(0xFF1E293B)        // Slate 800
+val NeuDarkLightShadow = Color(0x29FFFFFF)    // Reflejo blanco tenue 16% superior izquierdo
+val NeuDarkDarkShadow = Color(0x99000000)     // Sombra negra 60% inferior derecha
+val NeuDarkPressed = Color(0xFF162032)
+val NeuDarkBorder = Color(0xFF334155)         // Slate 700
 
 // Tokens Glassmorphic (Frosted Glass / Vidrio Esmerilado)
 val GlassSurfaceLight = Color(0xD9FFFFFF)    // 85% blanco vítreo
@@ -32,6 +40,10 @@ val GlassBorderHighlight = Color(0xCCFFFFFF) // 80% blanco especular
 val GlassBorderShadow = Color(0x33FFFFFF)    // 20% blanco tenue
 val GlassActiveCyan = Color(0xB397F0FF)      // 70% cian translúcido activo
 val GlassShadowTint = Color(0x2E002544)      // Sombra etérea de cristal
+
+// Tokens Glassmorphic Modo Oscuro
+val GlassDarkSurface = Color(0x401E293B)     // Superficie oscura esmerilada
+val GlassDarkBorder = Color(0x4D94A3B8)      // Borde especular nocturno
 
 val GlassPrimaryBrush = Brush.horizontalGradient(
     colors = listOf(
