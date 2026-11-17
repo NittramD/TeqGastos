@@ -39,10 +39,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.teqgastos.model.TrasladoTeqRuta
 import com.example.teqgastos.ui.components.formatClp
 import com.example.teqgastos.ui.theme.TeqPrimary
 import com.example.teqgastos.ui.viewmodel.TecnicoViewModel
-import com.example.teqgastos.ui.viewmodel.TrasladoTeqRuta
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

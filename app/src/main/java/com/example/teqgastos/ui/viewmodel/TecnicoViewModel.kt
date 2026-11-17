@@ -11,6 +11,7 @@ import com.example.teqgastos.data.repository.TeqGastosRepository
 import com.example.teqgastos.model.EstadoGasto
 import com.example.teqgastos.model.EstadoRendicion
 import com.example.teqgastos.model.FormaPago
+import com.example.teqgastos.model.TrasladoTeqRuta
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,14 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-data class TrasladoTeqRuta(
-    val id: String,
-    val tramo: String,
-    val kilometros: Double,
-    val peajesClp: Double,
-    val combustibleClp: Double,
-    val fecha: String
-)
+typealias TrasladoTeqRuta = com.example.teqgastos.model.TrasladoTeqRuta
 
 class TecnicoViewModel(private val repository: TeqGastosRepository) : ViewModel() {
 
